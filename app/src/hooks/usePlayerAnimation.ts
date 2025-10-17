@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { state, stepCompleted } from "../stores/player";
 import { tileSize } from "../constants";
+import useGameStore from "../stores/game";
 import type { RefObject } from "react";
 
 export default function usePlayerAnimation(ref: RefObject<THREE.Group<THREE.Object3DEventMap> | null>) {
@@ -10,6 +11,11 @@ export default function usePlayerAnimation(ref: RefObject<THREE.Group<THREE.Obje
   useFrame(() => {
     if (!ref.current) return;
     if (!state.movesQueue.length) return;
+    
+    // Only animate player when the game is running
+    const gameStatus = useGameStore.getState().status;
+    if (gameStatus !== "running") return;
+    
     const player = ref.current;
 
     if (!moveClock.running) moveClock.start();

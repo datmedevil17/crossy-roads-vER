@@ -5,6 +5,9 @@ import { Controls } from "./components/Controls";
 import "./Game.css";
 import { Score } from "./components/Score";
 import { Result } from "./components/Result";
+import { StartModal } from "./components/StartModal";
+import { Wallet } from "./components/Wallet";
+
 
 const Game = () => {
   return (
@@ -15,6 +18,8 @@ const Game = () => {
       </Scene>
       <Score/>
       <Controls/>
+      <Wallet/>
+      <StartModal/>
       <Result/>
     </div>
   )

@@ -9,16 +9,22 @@ export interface PlayerState {
     currentTile: number;
     movesQueue: Direction[];
     ref: any;
+    onStepCompleted?: () => void;
 }
 
 export const state: PlayerState = {
   currentRow: 0,
   currentTile: 0,
   movesQueue: [],
-  ref: null
+  ref: null,
+  onStepCompleted: undefined
 };
 
 export function queueMove(direction: Direction): void {
+  // Only allow moves when the game is running
+  const gameState = useGameStore.getState();
+  if (gameState.status !== "running") return;
+
   const isValidMove = endsUpInValidPosition(
     { rowIndex: state.currentRow, tileIndex: state.currentTile },
     [...state.movesQueue, direction]
@@ -43,10 +49,19 @@ export function stepCompleted() {
   }
 
   useGameStore.getState().updateScore();
+  
+  // Call the blockchain step callback if it exists
+  if (state.onStepCompleted) {
+    state.onStepCompleted();
+  }
 }
 
 export function setRef(ref: any) {
   state.ref = ref;
+}
+
+export function setStepCallback(callback?: () => void) {
+  state.onStepCompleted = callback;
 }
 
 export function reset() {

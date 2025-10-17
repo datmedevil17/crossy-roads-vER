@@ -4,17 +4,18 @@ import { reset as resetPlayerStore } from "./player";
 
 interface GameState {
   score: number;
-  status: "running" | "over";
+  status: "waiting" | "running" | "over";
   updateScore: () => void;
   endGame: () => void;
   incrementScore: () => void;
   resetScore: () => void;
   reset: () => void;
+  startGame: () => void;
 }
 
 const useStore = create<GameState>((set) => ({
   score: 0,
-  status: "running",
+  status: "waiting",
 
   updateScore: () => {
     set((state) => ({ score: state.score + 1 }));
@@ -28,11 +29,15 @@ const useStore = create<GameState>((set) => ({
   
   resetScore: () => set({ score: 0 }),
   
+  startGame: () => {
+    set({ status: "running" });
+  },
+  
   reset: () => {
     const mapState = useMapStore.getState() as { reset: () => void };
     mapState.reset();
     resetPlayerStore();
-    set({ status: "running", score: 0 });
+    set({ status: "waiting", score: 0 });
   },
 }));
 
