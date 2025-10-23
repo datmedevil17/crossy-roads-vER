@@ -1,18 +1,14 @@
 import { Bounds } from "@react-three/drei"
 import { useEffect, useRef } from "react";
 import { Group, DirectionalLight as ThreeDirectionalLight } from "three";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { toast } from "react-toastify";
 import usePlayerAnimation from "../hooks/usePlayerAnimation";
 import { useThree } from "@react-three/fiber";
 import { DirectionalLight } from "./DirectionalLight";
-import { setRef, setStepCallback } from "../stores/player";
-import { getProvider, takeStep as takeStepBlockchain } from "../services/blockchain";
+import { setRef } from "../stores/player";
 
 const Player = () => {
   const player = useRef<Group | null>(null);
   const lightRef = useRef<ThreeDirectionalLight | null>(null);
-  const { publicKey, signTransaction, sendTransaction } = useWallet();
 
   const camera = useThree((state) => state.camera);
 
@@ -27,44 +23,6 @@ const Player = () => {
     lightRef.current.target = player.current;
     setRef(player.current);
   });
-
-  // Set up blockchain step callback
-  useEffect(() => {
-    const handleStep = async () => {
-      if (!publicKey) {
-        console.log("⚠️ No wallet connected, skipping blockchain step");
-        return;
-      }
-
-      try {
-        const program = getProvider(publicKey, signTransaction, sendTransaction);
-        if (!program) {
-          console.log("⚠️ No blockchain program available");
-          return;
-        }
-
-        console.log("🚶 Taking step on blockchain...");
-        const signature = await takeStepBlockchain(program, publicKey);
-        console.log("✅ Step recorded on blockchain:", signature);
-        toast.success(`Step recorded! TX: ${signature.slice(0, 8)}...`, {
-          autoClose: 2000,
-        });
-      } catch (error) {
-        console.error("❌ Failed to record step on blockchain:", error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        toast.error(`Step failed: ${errorMessage}`, {
-          autoClose: 3000,
-        });
-      }
-    };
-
-    setStepCallback(handleStep);
-
-    // Cleanup callback on unmount
-    return () => {
-      setStepCallback(undefined);
-    };
-  }, [publicKey, signTransaction, sendTransaction]);
 
   return (
     <Bounds fit clip observe margin={10}>
