@@ -1,4 +1,4 @@
-import { AnchorProvider, Program, Wallet} from "@coral-xyz/anchor";
+import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import {
   Connection,
   Keypair,
@@ -12,7 +12,7 @@ import { type CrossyRoads } from "./crossy_roads";
 import idl from "./crossy_roads.json";
 import { getClusterURL } from "../utilities/helpers";
 
-const CLUSTER: string = process.env.NEXT_PUBLIC_CLUSTER || "devnet";
+const CLUSTER: string = import.meta.env.VITE_CLUSTER || "devnet";
 const RPC_URL: string = getClusterURL(CLUSTER);
 import { MAGICBLOCK_RPC } from "../utilities/helpers";
 import type { GameSession, GameStateData, SessionInfo, DelegationInfo } from "./interface";
@@ -36,7 +36,7 @@ export const getProvider = (
   const connection = new Connection(RPC_URL, "confirmed");
   const provider = new AnchorProvider(
     connection,
-    { publicKey, signTransaction, sendTransaction } as unknown as Wallet,
+    { publicKey, signTransaction, sendTransaction } as any,
     { commitment: "processed" }
   );
 
@@ -58,7 +58,7 @@ export const getProviderReadonly = (): Program<CrossyRoads> => {
 
   const provider = new AnchorProvider(
     connection,
-    wallet as unknown as Wallet,
+    wallet as any,
     { commitment: "processed" }
   );
 
@@ -184,6 +184,8 @@ export const takeStep = async (
   program: Program<CrossyRoads>,
   playerPublicKey: PublicKey
 ): Promise<string> => {
+  console.log("🎯 takeStep function called!", { player: playerPublicKey.toBase58() });
+  
   if (!program.provider.publicKey) throw new Error("Wallet not connected");
 
   const [sessionPda] = getSessionPda(program.programId, playerPublicKey);
@@ -192,28 +194,36 @@ export const takeStep = async (
   try {
     const session = await program.account.gameSession.fetch(sessionPda);
     if (!session.isActive) throw new Error("Game session is not active");
+    console.log("📋 Session found, current step count:", session.stepCount?.toString() || "0");
   } catch (err) {
+    console.error("❌ Session fetch error:", err);
     throw new Error("No active game session found");
   }
 
   // Check if session is delegated
   const accountInfo = await program.provider.connection.getAccountInfo(sessionPda);
   const delegated = !!accountInfo && !accountInfo.owner.equals(program.programId);
+  
+  console.log("🚶 Taking step on blockchain...", { 
+    playerPublicKey: playerPublicKey.toBase58(), 
+    delegated,
+    sessionPda: sessionPda.toBase58()
+  });
 
   if (delegated) {
-    // UNSAFE: derive temp keypair for ephemeral transactions
+    // Use ephemeral provider for delegated sessions
     const tempSeed = playerPublicKey.toBytes();
     const tempKeypair = Keypair.fromSeed(tempSeed);
-
+    
     const ephemeralConnection = new Connection(MAGICBLOCK_RPC, {
       commitment: "confirmed",
     });
 
     const tx: Transaction = await program.methods
       .takeStep()
-      .accounts({
+      .accountsPartial({
         session: sessionPda,
-        player: playerPublicKey,
+        player: tempKeypair.publicKey  // Use actual player, not temp keypair
       })
       .transaction();
 
@@ -223,8 +233,11 @@ export const takeStep = async (
 
     tx.recentBlockhash = blockhash;
     tx.feePayer = tempKeypair.publicKey;
+
+    // sign with tempKeypair (UNSAFE)
     tx.sign(tempKeypair);
 
+    // send raw to MagicBlock RPC
     const raw = tx.serialize();
     const signature = await ephemeralConnection.sendRawTransaction(raw, {
       skipPreflight: true,
@@ -234,7 +247,7 @@ export const takeStep = async (
       "confirmed"
     );
 
-    console.log("✅ Step taken (ephemeral):", signature);
+    console.log("✅ Step Recorded (ephemeral):", signature);
     return signature;
   } else {
     // Wallet-signed transaction
@@ -341,44 +354,15 @@ export const endGame = async (
 
     const tempSeed = playerPublicKey.toBytes();
     const tempKeypair = Keypair.fromSeed(tempSeed);
-    const ephemeralConnection = new Connection(MAGICBLOCK_RPC, {
-      commitment: "confirmed",
-    });
-
-    interface EphemeralWallet {
-      publicKey: PublicKey;
-      signTransaction: (tx: Transaction) => Promise<Transaction>;
-      signAllTransactions: (txs: Transaction[]) => Promise<Transaction[]>;
-    }
-
-    const ephemeralWallet: EphemeralWallet = {
-      publicKey: tempKeypair.publicKey,
-      signTransaction: async (tx: Transaction) => {
-        tx.sign(tempKeypair);
-        return tx;
-      },
-      signAllTransactions: async (txs: Transaction[]) => {
-        txs.forEach((tx) => tx.sign(tempKeypair));
-        return txs;
-      },
-    };
-
-    const ephemeralProvider = new AnchorProvider(
-      ephemeralConnection,
-      ephemeralWallet as unknown as AnchorProvider["wallet"],
-      AnchorProvider.defaultOptions()
-    );
-
-    const ephemeralProgram = new Program<CrossyRoads>(
-      program.idl as CrossyRoads,
-      ephemeralProvider
-    );
+    // const ephemeralConnection = new Connection(MAGICBLOCK_RPC, {
+    //   commitment: "confirmed",
+    // });
 
     const magicContext = new PublicKey("MagicContext1111111111111111111111111111111");
     const magicProgram = new PublicKey("Magic11111111111111111111111111111111111111");
 
     // End game via ephemeral connection (this handles undelegation)
-    const endSignature = await ephemeralProgram.methods
+    const endSignature = await program.methods
       .endGame()
       .accountsPartial({
         session: sessionPda,
