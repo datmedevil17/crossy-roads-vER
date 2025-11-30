@@ -2,7 +2,10 @@
 
 A revolutionary on-chain gaming experience built on Solana, leveraging **Magic Block's Ephemeral Rollups** for lightning-fast transactions and seamless gameplay. This project demonstrates how blockchain gaming can achieve near-instant transaction speeds while maintaining decentralization and security.
 
-![Crossy Roads Banner](./assets/banner.png)
+<img width="1920" height="972" alt="image" src="https://github.com/user-attachments/assets/caa66b27-1eeb-41b9-aeb2-ea42d5300fc1" />
+
+<img width="1920" height="972" alt="Screenshot From 2025-11-30 15-48-07" src="https://github.com/user-attachments/assets/04ed5f4a-e937-4d50-b677-16336ed1ef75" />
+
 
 ---
 
